@@ -153,7 +153,7 @@ class ServiceDetector {
       
       socket.listen((data) {
         if (!completer.isCompleted) {
-          completer.complete(utf8.decode(data).trim());
+          completer.complete(utf8.decode(data, allowMalformed: true).trim());
         }
         socket.destroy();
       });
@@ -178,7 +178,7 @@ class ServiceDetector {
       final buffer = StringBuffer();
       
       socket.listen((data) {
-        final text = utf8.decode(data);
+        final text = utf8.decode(data, allowMalformed: true);
         buffer.write(text);
         if (text.contains('220 ') && !completer.isCompleted) {
           socket.write('EHLO flanexec.local\r\n');

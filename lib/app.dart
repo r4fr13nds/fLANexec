@@ -1,3 +1,4 @@
+import 'package:flanexec/features/credentials/screens/credentials_screen.dart';
 import 'package:flanexec/features/discovery/screens/discovery_screen.dart';
 import 'package:flanexec/features/service_info/screens/service_info_screen.dart';
 import 'package:flutter/material.dart';
@@ -28,7 +29,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/credentials',
-                builder: (context, state) => const Center(child: Text('Credentials')),
+                builder: (context, state) => const CredentialsScreen(),
               ),
             ],
           ),

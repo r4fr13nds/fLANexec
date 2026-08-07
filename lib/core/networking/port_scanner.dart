@@ -58,7 +58,9 @@ class PortScanner {
       } catch (_) {
         // Banner grab failed, but port is still open
       } finally {
-        socket.destroy();
+        try {
+          socket.destroy();
+        } catch (_) {}
       }
 
       return PortScanResult(

@@ -140,19 +140,26 @@ class ServiceInfoScreen extends HookConsumerWidget {
             ),
             if (hosts.isNotEmpty) ...[
               const Divider(height: 32),
-              const Text('From Discovery Results', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: hosts.expand((h) => h.ports.map((p) => ActionChip(
-                  label: Text('${h.ip}:${p.port}', style: const TextStyle(fontSize: 11)),
-                  onPressed: () {
-                    hostController.text = h.ip;
-                    portController.text = p.port.toString();
-                    notifier.probeService(h.ip, p.port);
-                  },
-                ))).cast<Widget>().toList().take(15).toList(),
+              ExpansionTile(
+                title: const Text('From Discovery Results', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: const Text('Tap to auto-fill host and port', style: TextStyle(fontSize: 12)),
+                childrenPadding: const EdgeInsets.only(bottom: 16),
+                tilePadding: EdgeInsets.zero,
+                initiallyExpanded: false,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: hosts.expand((h) => h.ports.map((p) => ActionChip(
+                      label: Text('${h.ip}:${p.port}', style: const TextStyle(fontSize: 11)),
+                      onPressed: () {
+                        hostController.text = h.ip;
+                        portController.text = p.port.toString();
+                        notifier.probeService(h.ip, p.port);
+                      },
+                    ))).cast<Widget>().toList().take(30).toList(),
+                  ),
+                ],
               ),
             ],
           ],

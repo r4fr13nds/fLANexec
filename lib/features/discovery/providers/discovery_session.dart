@@ -115,9 +115,7 @@ class DiscoverySessionNotifier extends StateNotifier<DiscoveryState> {
             }
           }
         } catch (e) {
-          final errorStr = e.toString();
-          final isCommon = errorStr.contains('errno = 54') || errorStr.contains('errno = 61') || errorStr.contains('errno = 65');
-          if (!isCommon) print('Error scanning $targetIp: $e');
+          // Silently ignore expected network errors during scan
         } finally {
           processed++;
           // Ensure we don't exceed 1.0 until the very end
