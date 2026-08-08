@@ -28,5 +28,19 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>fLANexec needs access to your local network to discover and scan hosts.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_tcp.local</string>
+		<string>_udp.local</string>
+		<string>_smb._tcp.local</string>
+		<string>_ssh._tcp.local</string>
+		<string>_http._tcp.local</string>
+		<string>_airplay._tcp.local</string>
+		<string>_raop._tcp.local</string>
+		<string>_apple-mobdev2._tcp.local</string>
+		<string>_googlecast._tcp.local</string>
+	</array>
 </dict>
 </plist>

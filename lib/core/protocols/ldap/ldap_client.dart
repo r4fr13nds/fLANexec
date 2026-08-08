@@ -56,7 +56,7 @@ class LdapClient {
 
     final searchRequest = ASN1Sequence(tag: 0x63); // [APPLICATION 3] SearchRequest
     searchRequest.add(ASN1OctetString(baseDn));
-    searchRequest.add(ASN1Enumerated(0)); // scope: baseObject(0)
+    searchRequest.add(ASN1Enumerated(2)); // scope: wholeSubtree(2)
     searchRequest.add(ASN1Enumerated(0)); // derefAliases: neverDerefAliases(0)
     searchRequest.add(ASN1Integer(BigInt.from(sizeLimit)));
     searchRequest.add(ASN1Integer(BigInt.from(0))); // timeLimit
@@ -125,13 +125,16 @@ class LdapClient {
       try {
         final parser = ASN1Parser(Uint8List.fromList(buffer));
         if (parser.hasNext()) {
-          completer.complete(Uint8List.fromList(buffer));
+          final obj = parser.nextObject();
+          if (obj is ASN1Sequence) {
+            completer.complete(Uint8List.fromList(buffer));
+          }
         }
       } catch (_) {}
     });
 
     try {
-      final data = await completer.future.timeout(const Duration(seconds: 3));
+      final data = await completer.future.timeout(const Duration(seconds: 10));
       sub.cancel();
       return ASN1Parser(data).nextObject() as ASN1Sequence;
     } catch (_) {

@@ -18,26 +18,28 @@ class Port with _$Port {
   factory Port.fromJson(Map<String, dynamic> json) => _$PortFromJson(json);
 }
 
+enum HostOs { windows, linux, macos, ios, android, networkDevice, unknown }
+
 @freezed
 class Host with _$Host {
   const Host._();
 
   const factory Host({
     required String ip,
-    String? mac,
+    String? macAddress,
     String? hostname,
+    String? netbiosName,
+    String? domain,
+    @Default(false) bool isDomainController,
+    @Default(HostOs.unknown) HostOs osType,
+    String? osVersion,
+    int? ttl,
     required String status,
     double? rttMs,
     @Default([]) List<Port> ports,
     DomainInfo? domainInfo,
     required DateTime lastSeen,
   }) = _Host;
-
-  bool get isDomainController {
-    if (domainInfo != null) return true;
-    final ldapPorts = [389, 636, 3268, 3269];
-    return ports.any((p) => ldapPorts.contains(p.port) && p.state == 'open');
-  }
 
   factory Host.fromJson(Map<String, dynamic> json) => _$HostFromJson(json);
 }

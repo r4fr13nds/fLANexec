@@ -1,11 +1,17 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flanexec/core/networking/host_resolver.dart';
 import 'package:flanexec/core/networking/ip_utils.dart';
+import 'package:flanexec/core/networking/nbns_resolver.dart';
+import 'package:flanexec/core/networking/os_fingerprinter.dart';
 import 'package:flanexec/core/networking/pinger.dart';
 import 'package:flanexec/core/networking/port_scanner.dart';
 import 'package:flanexec/core/protocols/ldap/domain_probe.dart';
+import 'package:flanexec/core/protocols/smb/smb_hostname_probe.dart';
+import 'package:flanexec/core/utils/logger.dart';
 import 'package:flanexec/features/discovery/providers/scan_config.dart';
 import 'package:flanexec/features/shared/models/host.dart';
+import 'package:flanexec/features/settings/providers/settings_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:pool/pool.dart';
 
@@ -50,93 +56,124 @@ class DiscoverySessionNotifier extends StateNotifier<DiscoveryState> {
   bool _isCanceled = false;
 
   Future<void> startScan() async {
-    final config = ref.read(scanConfigProvider);
-    if (!IpUtils.isValidCidr(config.cidr)) {
-      state = state.copyWith(status: DiscoveryStatus.error, error: 'Invalid CIDR');
-      return;
-    }
+    runZonedGuarded(() async {
+      final config = ref.read(scanConfigProvider);
+      final settings = ref.read(settingsProvider);
+      
+      ref.read(loggerProvider.notifier).log('engine', 'Scan initialization started...');
+      
+      if (!IpUtils.isValidCidr(config.cidr)) {
+        ref.read(loggerProvider.notifier).log('engine', 'Invalid CIDR: ${config.cidr}', level: LogLevel.error);
+        state = state.copyWith(status: DiscoveryStatus.error, error: 'Invalid CIDR');
+        return;
+      }
 
-    _isCanceled = false;
-    state = DiscoveryState(status: DiscoveryStatus.scanning);
+      _isCanceled = false;
+      state = DiscoveryState(status: DiscoveryStatus.scanning);
+      
+      final localIp = await IpUtils.getLocalIpAddress();
+      if (localIp == null || localIp == '127.0.0.1') {
+        ref.read(loggerProvider.notifier).log(
+          'engine', 
+          'CRITICAL: No local network interface found. स्टैंडअलोन (Standalone) mode: Please ensure the app has "Local Network" permission in System Settings > Privacy & Security.',
+          level: LogLevel.error,
+        );
+      }
 
-    final ips = IpUtils.expandCidr(config.cidr);
-    if (ips.isEmpty) {
-      state = state.copyWith(status: DiscoveryStatus.done);
-      return;
-    }
+      ref.read(loggerProvider.notifier).log(
+        localIp ?? '0.0.0.0', 
+        'Starting scan from local interface. Target: ${config.cidr}',
+        level: LogLevel.info,
+      );
 
-    final total = ips.length;
-    int processed = 0;
-    
-    final pool = Pool(config.concurrency);
-    final List<Future> tasks = [];
-    
-    for (final ip in ips) {
-      if (_isCanceled) break;
+      final ips = IpUtils.expandCidr(config.cidr);
+      ref.read(loggerProvider.notifier).log('engine', 'Expanded CIDR to ${ips.length} IPs');
+      
+      if (ips.isEmpty) {
+        state = state.copyWith(status: DiscoveryStatus.done);
+        return;
+      }
 
-      tasks.add(pool.withResource(() async {
-        if (_isCanceled) return;
+      final total = ips.length;
+      int processed = 0;
+      
+      final pool = Pool(settings.defaultConcurrency);
+      final List<Future> tasks = [];
+      
+      for (final ip in ips) {
+        if (_isCanceled) break;
 
-        final targetIp = ip;
-        try {
-          state = state.copyWith(currentIp: targetIp);
+        tasks.add(pool.withResource(() async {
+          if (_isCanceled) return;
 
-          // 1. Ping Check
-          final pingResult = await Pinger.ping(targetIp, timeout: Duration(seconds: config.timeoutSeconds));
+          final targetIp = ip;
+          try {
+            state = state.copyWith(currentIp: targetIp);
 
-          if (pingResult.status == PingStatus.alive) {
-            // 2. Add host immediately with minimal info
-            final initialHost = Host(
-              ip: targetIp,
-              status: 'alive',
-              rttMs: pingResult.rttMs,
-              lastSeen: DateTime.now(),
-            );
-            _addHost(initialHost);
+            // 1. Ping Check
+            final pingResult = await Pinger.ping(targetIp, timeout: Duration(seconds: settings.defaultTimeout));
 
-            // 3. Resolve Hostname in background (we don't await this to keep scan moving)
-            HostResolver.resolveHostname(targetIp).then((hostname) {
-              if (hostname != null && !_isCanceled) {
-                _updateHostName(targetIp, hostname);
+            if (pingResult.status == PingStatus.alive) {
+              ref.read(loggerProvider.notifier).log(targetIp, 'Host is alive', level: LogLevel.info);
+              // 2. Add host immediately with minimal info
+              final initialHost = Host(
+                ip: targetIp,
+                status: 'alive',
+                rttMs: pingResult.rttMs,
+                ttl: pingResult.ttl,
+                lastSeen: DateTime.now(),
+                ports: pingResult.respondedPort != null 
+                  ? [Port(port: pingResult.respondedPort!, protocol: 'tcp', state: 'open')] 
+                  : [],
+              );
+              _addHost(initialHost);
+
+              // 3. Resolve Identity (Parallel NBNS, SMB, LDAP, DNS)
+              _resolveHostIdentity(targetIp);
+
+              // 4. Port Scan
+              final scanStream = PortScanner.scanPorts(
+                targetIp,
+                config.ports,
+                concurrency: 5,
+                timeout: Duration(seconds: settings.defaultTimeout),
+              );
+
+              await for (final result in scanStream) {
+                if (_isCanceled) break;
+                _updateHostPorts(targetIp, result);
               }
-            }).catchError((_) {});
-
-            // 4. Port Scan
-            final scanStream = PortScanner.scanPorts(
-              targetIp,
-              config.ports,
-              concurrency: 5,
-              timeout: Duration(seconds: config.timeoutSeconds),
-            );
-
-            await for (final result in scanStream) {
-              if (_isCanceled) break;
-              _updateHostPorts(targetIp, result);
+              
+              // 5. Final Fingerprint for this host
+              _fingerprintHost(targetIp);
             }
+          } catch (e) {
+            // Silently ignore expected network errors during scan
+          } finally {
+            processed++;
+            // Ensure we don't exceed 1.0 until the very end
+            final newProgress = (processed / total).clamp(0.0, 0.999);
+            state = state.copyWith(progress: newProgress);
           }
-        } catch (e) {
-          // Silently ignore expected network errors during scan
-        } finally {
-          processed++;
-          // Ensure we don't exceed 1.0 until the very end
-          final newProgress = (processed / total).clamp(0.0, 0.999);
-          state = state.copyWith(progress: newProgress);
-        }
-      }));
-    }
+        }));
+      }
 
-    // Wait for all tasks to actually complete
-    await Future.wait(tasks);
-    await pool.close();
+      // Wait for all tasks to actually complete
+      await Future.wait(tasks);
+      await pool.close();
 
-    if (!_isCanceled) {
-      state = state.copyWith(status: DiscoveryStatus.done, progress: 1.0);
-    }
+      if (!_isCanceled) {
+        state = state.copyWith(status: DiscoveryStatus.done, progress: 1.0);
+      }
+    }, (error, stack) {
+      // Catch rogue socket exceptions that happen after cleanup
+    });
   }
 
   void _addHost(Host host) {
     if (state.hosts.any((h) => h.ip == host.ip)) return;
     state = state.copyWith(hosts: [...state.hosts, host]);
+    _fingerprintHost(host.ip);
   }
 
   void _updateHostName(String ip, String hostname) {
@@ -147,6 +184,63 @@ class DiscoverySessionNotifier extends StateNotifier<DiscoveryState> {
       return h;
     }).toList();
     state = state.copyWith(hosts: updatedHosts);
+    _fingerprintHost(ip);
+  }
+
+  Future<void> _resolveHostIdentity(String ip) async {
+    NbnsResolver.query(ip).then((res) => _updateFromNbns(ip, res));
+    SmbHostnameProbe.probe(ip).then((res) => _updateFromSmb(ip, res));
+    HostResolver.resolveHostname(ip).then((res) => _updateHostName(ip, res!)).catchError((_) {});
+    
+    // Explicit Apple Probe if we suspect it might be Apple or if it's currently Linux/Unknown
+    _probeApplePorts(ip);
+  }
+
+  Future<void> _probeApplePorts(String ip) async {
+    final applePorts = [62078, 5353, 5000];
+    for (var port in applePorts) {
+      try {
+        final socket = await Socket.connect(ip, port, timeout: const Duration(milliseconds: 400));
+        socket.destroy();
+        _updateHostPorts(ip, PortScanResult(host: ip, port: port, state: PortState.open));
+        break; // One hit is enough to confirm Apple presence
+      } catch (_) {}
+    }
+  }
+
+  void _updateFromNbns(String ip, NbnsResult? res) {
+    if (res == null || _isCanceled) return;
+    final updatedHosts = state.hosts.map((h) {
+      if (h.ip == ip) {
+        return h.copyWith(
+          macAddress: res.macAddress ?? h.macAddress,
+          netbiosName: res.netbiosName ?? h.netbiosName,
+          domain: res.domain ?? h.domain,
+          isDomainController: res.isDomainController || h.isDomainController,
+        );
+      }
+      return h;
+    }).toList();
+    state = state.copyWith(hosts: updatedHosts);
+    _fingerprintHost(ip);
+  }
+
+  void _updateFromSmb(String ip, SmbIdentity? res) {
+    if (res == null || _isCanceled) return;
+    final updatedHosts = state.hosts.map((h) {
+      if (h.ip == ip) {
+        return h.copyWith(
+          netbiosName: res.netbiosName ?? h.netbiosName,
+          domain: res.domain ?? h.domain,
+          hostname: res.dnsName ?? h.hostname,
+          osVersion: res.nativeOs ?? h.osVersion,
+          isDomainController: res.isDomainController || h.isDomainController,
+        );
+      }
+      return h;
+    }).toList();
+    state = state.copyWith(hosts: updatedHosts);
+    _fingerprintHost(ip, smbIdentity: res);
   }
 
   void _updateHostPorts(String ip, PortScanResult result) {
@@ -175,6 +269,7 @@ class DiscoverySessionNotifier extends StateNotifier<DiscoveryState> {
     }).toList();
     
     state = state.copyWith(hosts: updatedHosts);
+    _fingerprintHost(ip);
   }
 
   Future<void> _triggerDomainProbe(String ip) async {
@@ -183,20 +278,52 @@ class DiscoverySessionNotifier extends StateNotifier<DiscoveryState> {
       if (domainInfo != null) {
         final updatedHosts = state.hosts.map((h) {
           if (h.ip == ip) {
-            return h.copyWith(domainInfo: domainInfo);
+            return h.copyWith(
+              domainInfo: domainInfo,
+              domain: domainInfo.domain ?? h.domain,
+              hostname: domainInfo.dnsHostName ?? h.hostname,
+              isDomainController: true,
+            );
           }
           return h;
         }).toList();
         state = state.copyWith(hosts: updatedHosts);
+        _fingerprintHost(ip);
       }
     } catch (e) {
       print('Domain probe failed for $ip: $e');
     }
   }
 
+  void _fingerprintHost(String ip, {SmbIdentity? smbIdentity}) {
+    final hostIndex = state.hosts.indexWhere((h) => h.ip == ip);
+    if (hostIndex == -1) return;
+
+    final host = state.hosts[hostIndex];
+    final result = OsFingerprinter.detect(
+      ttl: host.ttl,
+      openPorts: host.ports.map((p) => p.port).toList(),
+      hostname: host.hostname,
+      netbiosName: host.netbiosName,
+      nativeOs: smbIdentity?.nativeOs ?? host.osVersion,
+      isDomainController: host.isDomainController,
+    );
+
+    final updatedHosts = List<Host>.from(state.hosts);
+    updatedHosts[hostIndex] = host.copyWith(
+      osType: result.osType,
+      osVersion: result.osVersion ?? host.osVersion,
+    );
+    state = state.copyWith(hosts: updatedHosts);
+  }
+
   void cancelScan() {
     _isCanceled = true;
     state = state.copyWith(status: DiscoveryStatus.idle, progress: 0);
+  }
+
+  void clearHistory() {
+    state = DiscoveryState(status: DiscoveryStatus.idle);
   }
 }
 

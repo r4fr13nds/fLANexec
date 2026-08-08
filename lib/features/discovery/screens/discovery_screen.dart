@@ -76,12 +76,14 @@ class DiscoveryScreen extends HookConsumerWidget {
             ),
           ],
           Expanded(
-            child: ListView.builder(
-              itemCount: session.hosts.length,
-              itemBuilder: (context, index) {
-                return HostListTile(host: session.hosts[index]);
-              },
-            ),
+            child: session.hosts.isEmpty && session.status == DiscoveryStatus.idle
+                ? _buildEmptyState(context, sessionNotifier)
+                : ListView.builder(
+                    itemCount: session.hosts.length,
+                    itemBuilder: (context, index) {
+                      return HostListTile(host: session.hosts[index]);
+                    },
+                  ),
           ),
         ],
       ),
@@ -92,6 +94,24 @@ class DiscoveryScreen extends HookConsumerWidget {
         label: Text(session.status == DiscoveryStatus.scanning ? 'Cancel' : 'Start Scan'),
         icon: Icon(session.status == DiscoveryStatus.scanning ? Icons.stop : Icons.search),
         backgroundColor: session.status == DiscoveryStatus.scanning ? Colors.red : null,
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, DiscoverySessionNotifier notifier) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.radar, size: 100, color: Colors.blue.withValues(alpha: 0.2)),
+          const SizedBox(height: 16),
+          Text(
+            'Ready to Explore',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          const Text('Scan your network to find alive hosts and services.'),
+        ],
       ),
     );
   }

@@ -12,9 +12,14 @@ class DomainProbe {
       if (rootDse == null) return null;
 
       final attrs = rootDse.attributes;
+      final defaultNamingContext = _getFirst(attrs['defaultNamingContext']);
+      final dnsDomain = defaultNamingContext?.split(',')
+          .where((s) => s.startsWith('DC='))
+          .map((s) => s.substring(3))
+          .join('.');
 
       return DomainInfo(
-        domain: _getFirst(attrs['defaultNamingContext']),
+        domain: dnsDomain ?? defaultNamingContext,
         forest: _getFirst(attrs['rootDomainNamingContext']),
         dnsHostName: _getFirst(attrs['dnsHostName']),
         serverDn: _getFirst(attrs['serverName']),

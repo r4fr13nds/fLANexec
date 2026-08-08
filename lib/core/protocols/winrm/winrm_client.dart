@@ -36,12 +36,16 @@ class WinrmClient {
           'Content-Type': 'application/soap+xml;charset=UTF-8',
         },
         body: body,
-      ).timeout(const Duration(seconds: 3));
+      ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         return response.body.contains('IdentifyResponse');
+      } else {
+        print('WinRM Identify failed: ${response.statusCode} - ${response.body}');
       }
-    } catch (_) {}
+    } catch (e) {
+      print('WinRM Identify error: $e');
+    }
     return false;
   }
 

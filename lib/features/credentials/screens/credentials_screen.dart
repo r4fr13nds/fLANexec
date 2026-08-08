@@ -1,3 +1,4 @@
+import 'package:flanexec/app.dart';
 import 'package:flanexec/features/credentials/models/credential_set.dart';
 import 'package:flanexec/features/credentials/providers/auth_session_provider.dart';
 import 'package:flanexec/features/credentials/providers/credential_provider.dart';
@@ -5,6 +6,8 @@ import 'package:flanexec/features/discovery/providers/discovery_session.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import 'package:csv/csv.dart';
+import 'package:share_plus/share_plus.dart';
 
 class CredentialsScreen extends HookConsumerWidget {
   const CredentialsScreen({super.key});
@@ -24,6 +27,7 @@ class CredentialsScreen extends HookConsumerWidget {
       appBar: AppBar(
         title: const Text('Authentication'),
         actions: [
+          _buildTaskBadge(authResults),
           IconButton(
             icon: const Icon(Icons.manage_accounts),
             onPressed: () => _showCredentialManager(context, ref, credentials),
@@ -38,7 +42,7 @@ class CredentialsScreen extends HookConsumerWidget {
             _buildHostCard(context, session, ref),
             _buildActionCard(context, credentials, selectedProtocol, activeCred, ref),
             if (activeCred != null && selectedHosts.isNotEmpty)
-              _buildResultsList(context, selectedHosts, activeCred, authResults),
+              _buildResultsList(context, selectedHosts, activeCred, authResults, selectedProtocol, ref),
           ],
         ),
       ),
@@ -55,6 +59,25 @@ class CredentialsScreen extends HookConsumerWidget {
         label: const Text('Run Auth Check'),
         icon: const Icon(Icons.play_arrow),
         backgroundColor: (activeCred != null && selectedHosts.isNotEmpty) ? null : Colors.grey,
+      ),
+    );
+  }
+
+  Widget _buildTaskBadge(Map<String, Map<String, AuthResultMatrix>> results) {
+    int pending = 0;
+    results.forEach((host, creds) {
+      creds.forEach((id, res) {
+        if (res.success == null) pending++;
+      });
+    });
+
+    if (pending == 0) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0),
+      child: Badge(
+        label: Text(pending.toString()),
+        child: const Icon(Icons.sync),
       ),
     );
   }
@@ -172,12 +195,25 @@ class CredentialsScreen extends HookConsumerWidget {
     Set<String> hosts,
     CredentialSet activeCred,
     Map<String, Map<String, AuthResultMatrix>> results,
+    CredentialType selectedProtocol,
+    WidgetRef ref,
   ) {
     return Column(
       children: [
-        const Padding(
-          padding: EdgeInsets.only(top: 24, bottom: 8),
-          child: Text('3. Results', style: TextStyle(fontWeight: FontWeight.bold)),
+        Padding(
+          padding: const EdgeInsets.only(top: 24, bottom: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('3. Results', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.download, size: 18),
+                onPressed: () => _exportToCsv(context, results, activeCred, selectedProtocol),
+                tooltip: 'Export Results to CSV',
+              ),
+            ],
+          ),
         ),
         ...hosts.map((h) {
           final res = results[h]?[activeCred.id];
@@ -185,7 +221,7 @@ class CredentialsScreen extends HookConsumerWidget {
             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             child: ExpansionTile(
               leading: _buildResultIcon(res),
-              title: Text(h, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+              title: Text(h, style: Theme.of(context).textTheme.mono.copyWith(fontSize: 14, fontWeight: FontWeight.bold)),
               subtitle: Text(
                 res?.info ?? 'Awaiting execution...',
                 style: TextStyle(
@@ -202,17 +238,33 @@ class CredentialsScreen extends HookConsumerWidget {
                 if (res?.info != null)
                   Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: SelectableText(
-                        res!.info!,
-                        style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (res?.success == true) ...[
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              if (selectedProtocol == CredentialType.smb)
+                                _buildEnumButton(ref, h, activeCred, 'shares', Icons.folder_open),
+                              if (selectedProtocol == CredentialType.ssh || selectedProtocol == CredentialType.winrm)
+                                _buildEnumButton(ref, h, activeCred, 'permissions', Icons.security_outlined),
+                              if (selectedProtocol == CredentialType.ldap || selectedProtocol == CredentialType.smb)
+                                _buildEnumButton(ref, h, activeCred, 'groups', Icons.group_work_outlined),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: _buildReportContent(context, res),
+                        ),
+                      ],
                     ),
                   ),
               ],
@@ -220,6 +272,50 @@ class CredentialsScreen extends HookConsumerWidget {
           );
         }),
       ],
+    );
+  }
+
+  Widget _buildEnumButton(WidgetRef ref, String host, CredentialSet cred, String type, IconData icon) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton.filledTonal(
+          onPressed: () => ref.read(authSessionProvider.notifier).runEnumeration(host, cred, type),
+          icon: Icon(icon, size: 20),
+          tooltip: 'Run $type enumeration',
+        ),
+        Text(type.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Widget _buildReportContent(BuildContext context, AuthResultMatrix? res) {
+    if (res == null) return const Text('No data');
+    
+    final reports = res.reportData;
+    if (reports == null || reports.isEmpty) {
+      return SelectableText(
+        res.info ?? '',
+        style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+      );
+    }
+
+    final buffer = StringBuffer();
+    reports.forEach((type, data) {
+      buffer.writeln('--- ${type.toUpperCase()} REPORT ---');
+      if (data is List) {
+        for (var item in data) {
+          buffer.writeln('• $item');
+        }
+      } else {
+        buffer.writeln(data.toString());
+      }
+      buffer.writeln('');
+    });
+
+    return SelectableText(
+      buffer.toString().trim(),
+      style: Theme.of(context).textTheme.monoSmall.copyWith(fontSize: 12),
     );
   }
 
@@ -231,6 +327,42 @@ class CredentialsScreen extends HookConsumerWidget {
     return Icon(
       res.success == true ? Icons.security : Icons.security_update_warning,
       color: res.success == true ? Colors.green : Colors.red,
+    );
+  }
+
+  void _exportToCsv(
+    BuildContext context,
+    Map<String, Map<String, AuthResultMatrix>> results,
+    CredentialSet cred,
+    CredentialType protocol,
+  ) {
+    final List<List<dynamic>> rows = [
+      ['Host', 'Protocol', 'User', 'Status', 'Details']
+    ];
+
+    results.forEach((host, hostResults) {
+      final res = hostResults[cred.id];
+      if (res != null) {
+        rows.add([
+          host,
+          protocol.name.toUpperCase(),
+          cred.username,
+          res.success == true ? 'SUCCESS' : (res.success == false ? 'FAILED' : 'PENDING'),
+          res.info ?? '',
+        ]);
+      }
+    });
+
+    final csvData = const ListToCsvConverter().convert(rows);
+    
+    // For iPad and macOS, we need to specify a share position origin to prevent crashes
+    final box = context.findRenderObject() as RenderBox?;
+    Share.share(
+      csvData, 
+      subject: 'fLANexec Authentication Results',
+      sharePositionOrigin: box != null 
+          ? box.localToGlobal(Offset.zero) & box.size 
+          : null,
     );
   }
 

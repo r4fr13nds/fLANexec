@@ -28,5 +28,6 @@ class AuthResultMatrix with _$AuthResultMatrix {
     required String protocol,
     required bool? success, // null = pending/unknown, true = success, false = failure
     String? info,
+    Map<String, dynamic>? reportData,
   }) = _AuthResultMatrix;
 }

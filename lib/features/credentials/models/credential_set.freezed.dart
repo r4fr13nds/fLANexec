@@ -318,6 +318,7 @@ mixin _$AuthResultMatrix {
   bool? get success =>
       throw _privateConstructorUsedError; // null = pending/unknown, true = success, false = failure
   String? get info => throw _privateConstructorUsedError;
+  Map<String, dynamic>? get reportData => throw _privateConstructorUsedError;
 
   /// Create a copy of AuthResultMatrix
   /// with the given fields replaced by the non-null parameter values.
@@ -339,6 +340,7 @@ abstract class $AuthResultMatrixCopyWith<$Res> {
     String protocol,
     bool? success,
     String? info,
+    Map<String, dynamic>? reportData,
   });
 }
 
@@ -362,6 +364,7 @@ class _$AuthResultMatrixCopyWithImpl<$Res, $Val extends AuthResultMatrix>
     Object? protocol = null,
     Object? success = freezed,
     Object? info = freezed,
+    Object? reportData = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -385,6 +388,10 @@ class _$AuthResultMatrixCopyWithImpl<$Res, $Val extends AuthResultMatrix>
                 ? _value.info
                 : info // ignore: cast_nullable_to_non_nullable
                       as String?,
+            reportData: freezed == reportData
+                ? _value.reportData
+                : reportData // ignore: cast_nullable_to_non_nullable
+                      as Map<String, dynamic>?,
           )
           as $Val,
     );
@@ -406,6 +413,7 @@ abstract class _$$AuthResultMatrixImplCopyWith<$Res>
     String protocol,
     bool? success,
     String? info,
+    Map<String, dynamic>? reportData,
   });
 }
 
@@ -428,6 +436,7 @@ class __$$AuthResultMatrixImplCopyWithImpl<$Res>
     Object? protocol = null,
     Object? success = freezed,
     Object? info = freezed,
+    Object? reportData = freezed,
   }) {
     return _then(
       _$AuthResultMatrixImpl(
@@ -451,6 +460,10 @@ class __$$AuthResultMatrixImplCopyWithImpl<$Res>
             ? _value.info
             : info // ignore: cast_nullable_to_non_nullable
                   as String?,
+        reportData: freezed == reportData
+            ? _value._reportData
+            : reportData // ignore: cast_nullable_to_non_nullable
+                  as Map<String, dynamic>?,
       ),
     );
   }
@@ -465,7 +478,8 @@ class _$AuthResultMatrixImpl implements _AuthResultMatrix {
     required this.protocol,
     required this.success,
     this.info,
-  });
+    final Map<String, dynamic>? reportData,
+  }) : _reportData = reportData;
 
   @override
   final String host;
@@ -478,10 +492,19 @@ class _$AuthResultMatrixImpl implements _AuthResultMatrix {
   // null = pending/unknown, true = success, false = failure
   @override
   final String? info;
+  final Map<String, dynamic>? _reportData;
+  @override
+  Map<String, dynamic>? get reportData {
+    final value = _reportData;
+    if (value == null) return null;
+    if (_reportData is EqualUnmodifiableMapView) return _reportData;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(value);
+  }
 
   @override
   String toString() {
-    return 'AuthResultMatrix(host: $host, credentialId: $credentialId, protocol: $protocol, success: $success, info: $info)';
+    return 'AuthResultMatrix(host: $host, credentialId: $credentialId, protocol: $protocol, success: $success, info: $info, reportData: $reportData)';
   }
 
   @override
@@ -495,12 +518,23 @@ class _$AuthResultMatrixImpl implements _AuthResultMatrix {
             (identical(other.protocol, protocol) ||
                 other.protocol == protocol) &&
             (identical(other.success, success) || other.success == success) &&
-            (identical(other.info, info) || other.info == info));
+            (identical(other.info, info) || other.info == info) &&
+            const DeepCollectionEquality().equals(
+              other._reportData,
+              _reportData,
+            ));
   }
 
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, host, credentialId, protocol, success, info);
+  int get hashCode => Object.hash(
+    runtimeType,
+    host,
+    credentialId,
+    protocol,
+    success,
+    info,
+    const DeepCollectionEquality().hash(_reportData),
+  );
 
   /// Create a copy of AuthResultMatrix
   /// with the given fields replaced by the non-null parameter values.
@@ -521,6 +555,7 @@ abstract class _AuthResultMatrix implements AuthResultMatrix {
     required final String protocol,
     required final bool? success,
     final String? info,
+    final Map<String, dynamic>? reportData,
   }) = _$AuthResultMatrixImpl;
 
   @override
@@ -533,6 +568,8 @@ abstract class _AuthResultMatrix implements AuthResultMatrix {
   bool? get success; // null = pending/unknown, true = success, false = failure
   @override
   String? get info;
+  @override
+  Map<String, dynamic>? get reportData;
 
   /// Create a copy of AuthResultMatrix
   /// with the given fields replaced by the non-null parameter values.

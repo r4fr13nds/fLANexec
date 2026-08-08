@@ -280,8 +280,14 @@ Host _$HostFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$Host {
   String get ip => throw _privateConstructorUsedError;
-  String? get mac => throw _privateConstructorUsedError;
+  String? get macAddress => throw _privateConstructorUsedError;
   String? get hostname => throw _privateConstructorUsedError;
+  String? get netbiosName => throw _privateConstructorUsedError;
+  String? get domain => throw _privateConstructorUsedError;
+  bool get isDomainController => throw _privateConstructorUsedError;
+  HostOs get osType => throw _privateConstructorUsedError;
+  String? get osVersion => throw _privateConstructorUsedError;
+  int? get ttl => throw _privateConstructorUsedError;
   String get status => throw _privateConstructorUsedError;
   double? get rttMs => throw _privateConstructorUsedError;
   List<Port> get ports => throw _privateConstructorUsedError;
@@ -304,8 +310,14 @@ abstract class $HostCopyWith<$Res> {
   @useResult
   $Res call({
     String ip,
-    String? mac,
+    String? macAddress,
     String? hostname,
+    String? netbiosName,
+    String? domain,
+    bool isDomainController,
+    HostOs osType,
+    String? osVersion,
+    int? ttl,
     String status,
     double? rttMs,
     List<Port> ports,
@@ -332,8 +344,14 @@ class _$HostCopyWithImpl<$Res, $Val extends Host>
   @override
   $Res call({
     Object? ip = null,
-    Object? mac = freezed,
+    Object? macAddress = freezed,
     Object? hostname = freezed,
+    Object? netbiosName = freezed,
+    Object? domain = freezed,
+    Object? isDomainController = null,
+    Object? osType = null,
+    Object? osVersion = freezed,
+    Object? ttl = freezed,
     Object? status = null,
     Object? rttMs = freezed,
     Object? ports = null,
@@ -346,14 +364,38 @@ class _$HostCopyWithImpl<$Res, $Val extends Host>
                 ? _value.ip
                 : ip // ignore: cast_nullable_to_non_nullable
                       as String,
-            mac: freezed == mac
-                ? _value.mac
-                : mac // ignore: cast_nullable_to_non_nullable
+            macAddress: freezed == macAddress
+                ? _value.macAddress
+                : macAddress // ignore: cast_nullable_to_non_nullable
                       as String?,
             hostname: freezed == hostname
                 ? _value.hostname
                 : hostname // ignore: cast_nullable_to_non_nullable
                       as String?,
+            netbiosName: freezed == netbiosName
+                ? _value.netbiosName
+                : netbiosName // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            domain: freezed == domain
+                ? _value.domain
+                : domain // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            isDomainController: null == isDomainController
+                ? _value.isDomainController
+                : isDomainController // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            osType: null == osType
+                ? _value.osType
+                : osType // ignore: cast_nullable_to_non_nullable
+                      as HostOs,
+            osVersion: freezed == osVersion
+                ? _value.osVersion
+                : osVersion // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            ttl: freezed == ttl
+                ? _value.ttl
+                : ttl // ignore: cast_nullable_to_non_nullable
+                      as int?,
             status: null == status
                 ? _value.status
                 : status // ignore: cast_nullable_to_non_nullable
@@ -404,8 +446,14 @@ abstract class _$$HostImplCopyWith<$Res> implements $HostCopyWith<$Res> {
   @useResult
   $Res call({
     String ip,
-    String? mac,
+    String? macAddress,
     String? hostname,
+    String? netbiosName,
+    String? domain,
+    bool isDomainController,
+    HostOs osType,
+    String? osVersion,
+    int? ttl,
     String status,
     double? rttMs,
     List<Port> ports,
@@ -430,8 +478,14 @@ class __$$HostImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? ip = null,
-    Object? mac = freezed,
+    Object? macAddress = freezed,
     Object? hostname = freezed,
+    Object? netbiosName = freezed,
+    Object? domain = freezed,
+    Object? isDomainController = null,
+    Object? osType = null,
+    Object? osVersion = freezed,
+    Object? ttl = freezed,
     Object? status = null,
     Object? rttMs = freezed,
     Object? ports = null,
@@ -444,14 +498,38 @@ class __$$HostImplCopyWithImpl<$Res>
             ? _value.ip
             : ip // ignore: cast_nullable_to_non_nullable
                   as String,
-        mac: freezed == mac
-            ? _value.mac
-            : mac // ignore: cast_nullable_to_non_nullable
+        macAddress: freezed == macAddress
+            ? _value.macAddress
+            : macAddress // ignore: cast_nullable_to_non_nullable
                   as String?,
         hostname: freezed == hostname
             ? _value.hostname
             : hostname // ignore: cast_nullable_to_non_nullable
                   as String?,
+        netbiosName: freezed == netbiosName
+            ? _value.netbiosName
+            : netbiosName // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        domain: freezed == domain
+            ? _value.domain
+            : domain // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        isDomainController: null == isDomainController
+            ? _value.isDomainController
+            : isDomainController // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        osType: null == osType
+            ? _value.osType
+            : osType // ignore: cast_nullable_to_non_nullable
+                  as HostOs,
+        osVersion: freezed == osVersion
+            ? _value.osVersion
+            : osVersion // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        ttl: freezed == ttl
+            ? _value.ttl
+            : ttl // ignore: cast_nullable_to_non_nullable
+                  as int?,
         status: null == status
             ? _value.status
             : status // ignore: cast_nullable_to_non_nullable
@@ -482,8 +560,14 @@ class __$$HostImplCopyWithImpl<$Res>
 class _$HostImpl extends _Host {
   const _$HostImpl({
     required this.ip,
-    this.mac,
+    this.macAddress,
     this.hostname,
+    this.netbiosName,
+    this.domain,
+    this.isDomainController = false,
+    this.osType = HostOs.unknown,
+    this.osVersion,
+    this.ttl,
     required this.status,
     this.rttMs,
     final List<Port> ports = const [],
@@ -498,9 +582,23 @@ class _$HostImpl extends _Host {
   @override
   final String ip;
   @override
-  final String? mac;
+  final String? macAddress;
   @override
   final String? hostname;
+  @override
+  final String? netbiosName;
+  @override
+  final String? domain;
+  @override
+  @JsonKey()
+  final bool isDomainController;
+  @override
+  @JsonKey()
+  final HostOs osType;
+  @override
+  final String? osVersion;
+  @override
+  final int? ttl;
   @override
   final String status;
   @override
@@ -521,7 +619,7 @@ class _$HostImpl extends _Host {
 
   @override
   String toString() {
-    return 'Host(ip: $ip, mac: $mac, hostname: $hostname, status: $status, rttMs: $rttMs, ports: $ports, domainInfo: $domainInfo, lastSeen: $lastSeen)';
+    return 'Host(ip: $ip, macAddress: $macAddress, hostname: $hostname, netbiosName: $netbiosName, domain: $domain, isDomainController: $isDomainController, osType: $osType, osVersion: $osVersion, ttl: $ttl, status: $status, rttMs: $rttMs, ports: $ports, domainInfo: $domainInfo, lastSeen: $lastSeen)';
   }
 
   @override
@@ -530,9 +628,19 @@ class _$HostImpl extends _Host {
         (other.runtimeType == runtimeType &&
             other is _$HostImpl &&
             (identical(other.ip, ip) || other.ip == ip) &&
-            (identical(other.mac, mac) || other.mac == mac) &&
+            (identical(other.macAddress, macAddress) ||
+                other.macAddress == macAddress) &&
             (identical(other.hostname, hostname) ||
                 other.hostname == hostname) &&
+            (identical(other.netbiosName, netbiosName) ||
+                other.netbiosName == netbiosName) &&
+            (identical(other.domain, domain) || other.domain == domain) &&
+            (identical(other.isDomainController, isDomainController) ||
+                other.isDomainController == isDomainController) &&
+            (identical(other.osType, osType) || other.osType == osType) &&
+            (identical(other.osVersion, osVersion) ||
+                other.osVersion == osVersion) &&
+            (identical(other.ttl, ttl) || other.ttl == ttl) &&
             (identical(other.status, status) || other.status == status) &&
             (identical(other.rttMs, rttMs) || other.rttMs == rttMs) &&
             const DeepCollectionEquality().equals(other._ports, _ports) &&
@@ -547,8 +655,14 @@ class _$HostImpl extends _Host {
   int get hashCode => Object.hash(
     runtimeType,
     ip,
-    mac,
+    macAddress,
     hostname,
+    netbiosName,
+    domain,
+    isDomainController,
+    osType,
+    osVersion,
+    ttl,
     status,
     rttMs,
     const DeepCollectionEquality().hash(_ports),
@@ -573,8 +687,14 @@ class _$HostImpl extends _Host {
 abstract class _Host extends Host {
   const factory _Host({
     required final String ip,
-    final String? mac,
+    final String? macAddress,
     final String? hostname,
+    final String? netbiosName,
+    final String? domain,
+    final bool isDomainController,
+    final HostOs osType,
+    final String? osVersion,
+    final int? ttl,
     required final String status,
     final double? rttMs,
     final List<Port> ports,
@@ -588,9 +708,21 @@ abstract class _Host extends Host {
   @override
   String get ip;
   @override
-  String? get mac;
+  String? get macAddress;
   @override
   String? get hostname;
+  @override
+  String? get netbiosName;
+  @override
+  String? get domain;
+  @override
+  bool get isDomainController;
+  @override
+  HostOs get osType;
+  @override
+  String? get osVersion;
+  @override
+  int? get ttl;
   @override
   String get status;
   @override

@@ -58,7 +58,7 @@ class ScanConfig {
       case PortProfile.top1000:
         return List.generate(1000, (i) => i + 1);
       case PortProfile.quick:
-        return [22, 80, 443, 445, 3389, 389, 636];
+        return [22, 80, 443, 445, 3389, 389, 636, 62078, 5353];
       case PortProfile.custom:
         return customPorts
             .split(',')
