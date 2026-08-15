@@ -8,11 +8,18 @@ class PingResult {
   final double? rttMs;
   final int? ttl;
   final int? respondedPort;
+  final String method;
 
-  PingResult({required this.status, this.rttMs, this.ttl, this.respondedPort});
+  PingResult({
+    required this.status, 
+    this.rttMs, 
+    this.ttl, 
+    this.respondedPort,
+    this.method = 'icmp',
+  });
 
   @override
-  String toString() => 'PingResult(status: $status, rttMs: $rttMs, ttl: $ttl, port: $respondedPort)';
+  String toString() => 'PingResult(status: $status, rttMs: $rttMs, ttl: $ttl, port: $respondedPort, method: $method)';
 }
 
 class Pinger {
@@ -45,13 +52,32 @@ class Pinger {
       final result = await Process.run(executable, arguments);
       if (result.exitCode == 0) {
         final output = result.stdout.toString();
+        
+        // On Windows, verify we actually got a reply from the target
+        if (isWindows) {
+          // A successful Windows ping reply MUST contain "TTL=" and "time"
+          // If it contains "unreachable", "timed out", or lacks "TTL=", it's not a real response from the target.
+          final hasTtl = output.contains('TTL=');
+          final hasTime = output.contains('time');
+          final isUnreachable = output.contains('unreachable');
+          
+          if (!hasTtl || !hasTime || isUnreachable || output.contains('100% loss')) {
+            return PingResult(status: PingStatus.unreachable, method: 'icmp');
+          }
+          
+          // Also verify the reply is actually from the target IP, not a local error message
+          if (!output.contains(host)) {
+            return PingResult(status: PingStatus.unreachable, method: 'icmp');
+          }
+        }
+
         final rtt = _parseRtt(output, isWindows);
         final ttl = _parseTtl(output);
-        return PingResult(status: PingStatus.alive, rttMs: rtt, ttl: ttl);
+        return PingResult(status: PingStatus.alive, rttMs: rtt, ttl: ttl, method: 'icmp');
       }
     } catch (_) {}
 
-    return PingResult(status: PingStatus.unreachable);
+    return PingResult(status: PingStatus.unreachable, method: 'icmp');
   }
 
   static double? _parseRtt(String output, bool isWindows) {
@@ -95,10 +121,11 @@ class Pinger {
           status: PingStatus.alive, 
           rttMs: stopwatch.elapsedMilliseconds.toDouble(),
           respondedPort: port,
+          method: 'tcp',
         );
       } catch (_) {}
     }
 
-    return PingResult(status: PingStatus.unknown);
+    return PingResult(status: PingStatus.unknown, method: 'tcp');
   }
 }

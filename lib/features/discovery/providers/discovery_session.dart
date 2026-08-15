@@ -153,7 +153,11 @@ class DiscoverySessionNotifier extends StateNotifier<DiscoveryState> {
             final pingResult = await Pinger.ping(targetIp, timeout: Duration(seconds: settings.defaultTimeout));
 
             if (pingResult.status == PingStatus.alive) {
-              ref.read(loggerProvider.notifier).log(targetIp, 'Host is alive', level: LogLevel.info);
+              ref.read(loggerProvider.notifier).log(
+                targetIp, 
+                'Host is alive (via ${pingResult.method}${pingResult.respondedPort != null ? ':' + pingResult.respondedPort.toString() : ''})', 
+                level: LogLevel.info,
+              );
               // 2. Add host immediately with minimal info
               final initialHost = Host(
                 ip: targetIp,
@@ -185,6 +189,16 @@ class DiscoverySessionNotifier extends StateNotifier<DiscoveryState> {
               
               // 5. Final Fingerprint for this host
               _fingerprintHost(targetIp);
+              
+              // 6. Log if no ports were found for a host that was claimed to be alive
+              final host = state.hosts.firstWhere((h) => h.ip == targetIp);
+              if (host.ports.isEmpty) {
+                ref.read(loggerProvider.notifier).log(
+                  targetIp, 
+                  'Warning: Host was reported alive but no open ports were found in the scan range.', 
+                  level: LogLevel.warn,
+                );
+              }
             }
           } catch (e) {
             // Silently ignore expected network errors during scan
