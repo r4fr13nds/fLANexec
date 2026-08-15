@@ -79,8 +79,11 @@ class Pinger {
 
   static Future<PingResult> _pingMobileFallback(String host, Duration timeout) async {
     // Mobile often blocks ICMP. Fallback to TCP connect on common ports.
-    // Added 5353 (mDNS), 62078 (iOS), 5555 (ADB), 5000 (AirPlay), 139 (NetBIOS), 9100 (Printer), 8009 (Cast)
-    final ports = [80, 443, 22, 445, 139, 135, 5353, 62078, 5555, 5000, 9100, 8009, 111, 2049];
+    // Prioritizing definitive ports to speed up OS fingerprinting.
+    // 445 (SMB), 135/139 (NetBIOS/RPC), 3389 (RDP) -> Strong Windows indicators
+    // 22 (SSH) -> Strong Linux indicator
+    // 80/443 -> Generic web ports
+    final ports = [445, 135, 139, 3389, 22, 80, 443, 5353, 62078, 5555, 5000, 9100, 8009, 111, 2049];
     
     final stopwatch = Stopwatch()..start();
     for (var port in ports) {

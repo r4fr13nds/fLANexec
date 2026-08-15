@@ -13,6 +13,7 @@ import 'package:flanexec/features/discovery/providers/scan_config.dart';
 import 'package:flanexec/features/shared/models/host.dart';
 import 'package:flanexec/features/settings/providers/settings_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:multicast_dns/multicast_dns.dart';
 import 'package:pool/pool.dart';
 
 enum DiscoveryStatus { idle, scanning, done, error }
@@ -23,6 +24,7 @@ class DiscoveryState {
   final double progress;
   final String? currentIp;
   final String? error;
+  final Set<String> activeProbes;
 
   DiscoveryState({
     this.status = DiscoveryStatus.idle,
@@ -30,6 +32,7 @@ class DiscoveryState {
     this.progress = 0,
     this.currentIp,
     this.error,
+    this.activeProbes = const {},
   });
 
   DiscoveryState copyWith({
@@ -38,6 +41,7 @@ class DiscoveryState {
     double? progress,
     String? currentIp,
     String? error,
+    Set<String>? activeProbes,
   }) {
     return DiscoveryState(
       status: status ?? this.status,
@@ -45,6 +49,7 @@ class DiscoveryState {
       progress: progress ?? this.progress,
       currentIp: currentIp ?? this.currentIp,
       error: error ?? this.error,
+      activeProbes: activeProbes ?? this.activeProbes,
     );
   }
 }
@@ -56,6 +61,40 @@ class DiscoverySessionNotifier extends StateNotifier<DiscoveryState> {
   bool _isCanceled = false;
 
   Future<void> startScan() async {
+    // 1. On iOS, ensure "Local Network" permission is handled before starting
+    if (Platform.isIOS) {
+      String? localIp = await IpUtils.getLocalIpAddress();
+      
+      if (localIp == null || localIp == '127.0.0.1') {
+        ref.read(loggerProvider.notifier).log('system', 'Local Network permission check needed...', level: LogLevel.info);
+        await _triggerIosPermissionPrompt();
+        
+        // Loop and wait for permission to be granted (max 30 seconds)
+        // We check every 500ms if a valid local IP has appeared.
+        int attempts = 0;
+        while ((localIp == null || localIp == '127.0.0.1') && attempts < 60) {
+          if (_isCanceled) return;
+          await Future.delayed(const Duration(milliseconds: 500));
+          localIp = await IpUtils.getLocalIpAddress();
+          attempts++;
+          if (attempts == 1) {
+            ref.read(loggerProvider.notifier).log('system', 'Waiting for Local Network permission...', level: LogLevel.info);
+          }
+        }
+        
+        if (localIp != null && localIp != '127.0.0.1') {
+          ref.read(loggerProvider.notifier).log('system', 'Local Network permission granted.', level: LogLevel.info);
+          
+          // Re-infer the scan range now that we have a real IP
+          ref.read(scanConfigProvider.notifier).forceRefresh();
+          
+          // Network stack on iOS can be slow to route after permission grant
+          // Wait a bit more to ensure sockets don't fail immediately
+          await Future.delayed(const Duration(milliseconds: 1000));
+        }
+      }
+    }
+
     runZonedGuarded(() async {
       final config = ref.read(scanConfigProvider);
       final settings = ref.read(settingsProvider);
@@ -273,9 +312,14 @@ class DiscoverySessionNotifier extends StateNotifier<DiscoveryState> {
   }
 
   Future<void> _triggerDomainProbe(String ip) async {
+    if (state.activeProbes.contains(ip)) return;
+    
+    state = state.copyWith(activeProbes: {...state.activeProbes, ip});
     try {
+      ref.read(loggerProvider.notifier).log(ip, 'Probing LDAP Root DSE...', level: LogLevel.info);
       final domainInfo = await DomainProbe.probeDomain(ip);
       if (domainInfo != null) {
+        ref.read(loggerProvider.notifier).log(ip, 'LDAP info gathered: ${domainInfo.domain}', level: LogLevel.info);
         final updatedHosts = state.hosts.map((h) {
           if (h.ip == ip) {
             return h.copyWith(
@@ -289,9 +333,13 @@ class DiscoverySessionNotifier extends StateNotifier<DiscoveryState> {
         }).toList();
         state = state.copyWith(hosts: updatedHosts);
         _fingerprintHost(ip);
+      } else {
+        ref.read(loggerProvider.notifier).log(ip, 'LDAP probe returned no data', level: LogLevel.warn);
       }
     } catch (e) {
-      print('Domain probe failed for $ip: $e');
+      ref.read(loggerProvider.notifier).log(ip, 'LDAP probe failed: $e', level: LogLevel.error);
+    } finally {
+      state = state.copyWith(activeProbes: {...state.activeProbes}..remove(ip));
     }
   }
 
@@ -322,11 +370,97 @@ class DiscoverySessionNotifier extends StateNotifier<DiscoveryState> {
     state = state.copyWith(status: DiscoveryStatus.idle, progress: 0);
   }
 
-  void clearHistory() {
+  Future<void> clearHistory() async {
     state = DiscoveryState(status: DiscoveryStatus.idle);
+  }
+
+  Future<void> probeLdapForHost(String ip) async {
+    ref.read(loggerProvider.notifier).log(ip, 'Manual LDAP probe started');
+    await _triggerDomainProbe(ip);
+  }
+
+  /// Manually triggers the iOS permission check if needed.
+  Future<void> triggerPermissionCheck() async {
+    if (Platform.isIOS) {
+      final localIp = await IpUtils.getLocalIpAddress();
+      if (localIp == null || localIp == '127.0.0.1') {
+        await _triggerIosPermissionPrompt();
+      }
+    }
+  }
+
+  /// Triggers the iOS "Local Network" permission prompt by sending a dummy mDNS query.
+  Future<void> _triggerIosPermissionPrompt() async {
+    // Use runZonedGuarded to catch and silence the inevitable "No route to host"
+    // SocketExceptions that occur before the user grants permission.
+    await runZonedGuarded(() async {
+      const String name = '_http._tcp.local';
+      final MDnsClient client = MDnsClient();
+      try {
+        await client.start();
+        // The first lookup is what triggers the OS dialog. 
+        await client.lookup<PtrResourceRecord>(ResourceRecordQuery.serverPointer(name))
+            .first
+            .timeout(const Duration(milliseconds: 500));
+      } catch (_) {
+      } finally {
+        client.stop();
+      }
+      
+      // Also try to connect to a multicast address to be absolutely sure the prompt is triggered
+      try {
+        final socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+        socket.send([0], InternetAddress('224.0.0.251'), 5353);
+        socket.close();
+      } catch (_) {}
+      
+    }, (error, stack) {});
   }
 }
 
 final discoverySessionProvider = StateNotifierProvider<DiscoverySessionNotifier, DiscoveryState>((ref) {
   return DiscoverySessionNotifier(ref);
 });
+
+class TargetSelectionNotifier extends StateNotifier<Set<String>> {
+  TargetSelectionNotifier(this.ref) : super({});
+  final Ref ref;
+
+  void toggle(String ip) {
+    if (state.contains(ip)) {
+      state = {...state}..remove(ip);
+    } else {
+      state = {...state, ip};
+    }
+  }
+
+  void selectAll() {
+    final hosts = ref.read(discoverySessionProvider).hosts;
+    state = hosts.map((h) => h.ip).toSet();
+  }
+
+  void clearAll() {
+    state = {};
+  }
+
+  void selectByPort(int port) {
+    final hosts = ref.read(discoverySessionProvider).hosts;
+    final filtered = hosts
+        .where((h) => h.ports.any((p) => p.port == port))
+        .map((h) => h.ip);
+    state = {...state, ...filtered};
+  }
+
+  void selectByOs(HostOs os) {
+    final hosts = ref.read(discoverySessionProvider).hosts;
+    final filtered = hosts
+        .where((h) => h.osType == os)
+        .map((h) => h.ip);
+    state = {...state, ...filtered};
+  }
+}
+
+final selectedHostsProvider = StateNotifierProvider<TargetSelectionNotifier, Set<String>>((ref) {
+  return TargetSelectionNotifier(ref);
+});
+

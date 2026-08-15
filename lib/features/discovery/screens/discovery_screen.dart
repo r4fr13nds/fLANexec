@@ -27,16 +27,15 @@ class DiscoveryScreen extends HookConsumerWidget {
       return null;
     }, [config.ip]);
 
+    // Pre-trigger iOS Local Network permission prompt
+    useEffect(() {
+      Future.microtask(() => ref.read(discoverySessionProvider.notifier).triggerPermissionCheck());
+      return null;
+    }, []);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Discovery'),
-        actions: [
-          if (session.status == DiscoveryStatus.done)
-            IconButton(
-              icon: const Icon(Icons.save),
-              onPressed: () {},
-            ),
-        ],
       ),
       body: Column(
         children: [

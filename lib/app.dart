@@ -1,4 +1,4 @@
-import 'package:flanexec/features/credentials/screens/credentials_screen.dart';
+import 'package:flanexec/features/targets/screens/target_selection_screen.dart';
 import 'package:flanexec/features/discovery/screens/discovery_screen.dart';
 import 'package:flanexec/features/service_info/screens/service_info_screen.dart';
 import 'package:flanexec/features/settings/screens/settings_screen.dart';
@@ -34,8 +34,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/credentials',
-                builder: (context, state) => const CredentialsScreen(),
+                path: '/targets',
+                builder: (context, state) => const TargetSelectionScreen(),
               ),
             ],
           ),
@@ -113,7 +113,7 @@ class AppScaffold extends HookConsumerWidget {
                 onDestinationSelected: (index) => navigationShell.goBranch(index),
                 destinations: const [
                   NavigationDestination(icon: Icon(Icons.search), label: 'Discovery'),
-                  NavigationDestination(icon: Icon(Icons.security), label: 'Auth'),
+                  NavigationDestination(icon: Icon(Icons.security), label: 'AD/LDAP'),
                   NavigationDestination(icon: Icon(Icons.info_outline), label: 'Service'),
                   NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'Settings'),
                 ],
@@ -131,7 +131,7 @@ class AppScaffold extends HookConsumerWidget {
             extended: MediaQuery.of(context).size.width > 1200,
             destinations: const [
               NavigationRailDestination(icon: Icon(Icons.search), label: Text('Discovery')),
-              NavigationRailDestination(icon: Icon(Icons.security), label: Text('Authentication')),
+              NavigationRailDestination(icon: Icon(Icons.security), label: Text('AD/LDAP')),
               NavigationRailDestination(icon: Icon(Icons.info_outline), label: Text('Service Info')),
               NavigationRailDestination(icon: Icon(Icons.settings_outlined), label: Text('Settings')),
             ],

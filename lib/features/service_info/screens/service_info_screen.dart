@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
 
 class ServiceInfoScreen extends HookConsumerWidget {
   const ServiceInfoScreen({super.key});
@@ -31,12 +30,6 @@ class ServiceInfoScreen extends HookConsumerWidget {
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: _formatNmapOutput(serviceState.result!)));
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied to clipboard')));
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.share),
-              onPressed: () {
-                Share.share(_formatNmapOutput(serviceState.result!));
               },
             ),
           ]

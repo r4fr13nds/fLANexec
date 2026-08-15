@@ -4,7 +4,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 enum PortProfile {
   top100('Top 100'),
   top1000('Top 1000'),
-  quick('Quick (22,80,443,445,3389,389)'),
+  quick('Quick (22,80,389,443,445,3389)'),
   custom('Custom');
 
   final String label;
@@ -73,16 +73,24 @@ class ScanConfig {
 class ScanConfigNotifier extends StateNotifier<ScanConfig> {
   ScanConfigNotifier() : super(ScanConfig(ip: '', mask: 24));
 
-  void init() async {
+  Future<void> init() async {
     final ipAddress = await IpUtils.getLocalIpAddress();
-    if (ipAddress != null) {
-      // Basic logic to get base network IP (e.g. 192.168.1.0)
-      final parts = ipAddress.split('.');
-      if (parts.length == 4) {
-        final baseIp = '${parts[0]}.${parts[1]}.${parts[2]}.0';
-        state = state.copyWith(ip: baseIp, mask: 24);
-      }
+    if (ipAddress != null && ipAddress != '127.0.0.1') {
+      _updateFromAddress(ipAddress);
     }
+  }
+
+  void _updateFromAddress(String ipAddress) {
+    // Basic logic to get base network IP (e.g. 192.168.1.0)
+    final parts = ipAddress.split('.');
+    if (parts.length == 4) {
+      final baseIp = '${parts[0]}.${parts[1]}.${parts[2]}.0';
+      state = state.copyWith(ip: baseIp, mask: 24);
+    }
+  }
+
+  void forceRefresh() async {
+    await init();
   }
 
   void updateIp(String value) => state = state.copyWith(ip: value);

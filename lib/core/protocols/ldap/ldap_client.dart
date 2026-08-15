@@ -16,58 +16,104 @@ class LdapEntry {
 class LdapClient {
   Socket? _socket;
   int _messageId = 1;
+  final StreamController<ASN1Sequence> _messageController = StreamController<ASN1Sequence>.broadcast();
+  final List<int> _receiveBuffer = [];
+  StreamSubscription? _socketSubscription;
 
   Future<void> connect(String host, {int port = 389, bool useSsl = false, Duration? timeout}) async {
-    if (useSsl) {
-      _socket = await SecureSocket.connect(host, port, timeout: timeout);
-    } else {
-      _socket = await Socket.connect(host, port, timeout: timeout);
+    try {
+      if (useSsl) {
+        _socket = await SecureSocket.connect(host, port, timeout: timeout);
+      } else {
+        _socket = await Socket.connect(host, port, timeout: timeout);
+      }
+      _socketSubscription = _socket!.listen(_onData, onError: _onError, onDone: _onDone);
+    } catch (e) {
+      rethrow;
     }
+  }
+
+  void _onData(List<int> data) {
+    _receiveBuffer.addAll(data);
+    _parseBuffer();
+  }
+
+  void _parseBuffer() {
+    try {
+      while (_receiveBuffer.isNotEmpty) {
+        final parser = ASN1Parser(Uint8List.fromList(_receiveBuffer));
+        if (!parser.hasNext()) break;
+        
+        final obj = parser.nextObject();
+        if (obj is ASN1Sequence) {
+          _messageController.add(obj);
+          _receiveBuffer.removeRange(0, obj.encodedBytes.length);
+        } else {
+          _receiveBuffer.clear(); // Safety clear
+          break;
+        }
+      }
+    } catch (e) {
+      // Partial data or parse error, wait for more
+    }
+  }
+
+  void _onError(Object error) {
+    if (!_messageController.isClosed) {
+      _messageController.addError(error);
+    }
+  }
+
+  void _onDone() {
+    close();
   }
 
   Future<void> bind({String? dn, String? password}) async {
     final seq = ASN1Sequence();
     seq.add(ASN1Integer(BigInt.from(_messageId++)));
 
-    final bindRequest = ASN1Sequence(tag: 0x60); // [APPLICATION 0] BindRequest
+    final bindRequest = ASN1Sequence(tag: 0x60); // BindRequest
     bindRequest.add(ASN1Integer(BigInt.from(3))); // version v3
     bindRequest.add(ASN1OctetString(dn ?? ''));
     
     if (password != null) {
-      bindRequest.add(ASN1OctetString(password, tag: 0x80)); // [0] Simple Authentication
+      bindRequest.add(ASN1OctetString(password, tag: 0x80));
     } else {
-      bindRequest.add(ASN1OctetString('', tag: 0x80)); // Anonymous
+      bindRequest.add(ASN1OctetString('', tag: 0x80));
     }
     
     seq.add(bindRequest);
-    
     _socket!.add(seq.encodedBytes);
-    await _socket!.flush();
 
-    await _readMessage(); // Consume response
+    final resp = await _messageController.stream
+        .firstWhere((msg) => msg.elements[1].tag == 0x61)
+        .timeout(const Duration(seconds: 5));
+    
+    final bindResponse = resp.elements[1] as ASN1Sequence;
+    final resultCode = (bindResponse.elements[0] as ASN1Enumerated).intValue;
+    if (resultCode != 0) {
+      throw Exception('LDAP Bind failed with result code: $resultCode');
+    }
   }
 
   Future<List<LdapEntry>> search(String baseDn, String filter, {
     List<String> attributes = const [],
+    int scope = 2, // Default to wholeSubtree
     int sizeLimit = 1000,
   }) async {
     final seq = ASN1Sequence();
-    seq.add(ASN1Integer(BigInt.from(_messageId++)));
+    final currentId = _messageId++;
+    seq.add(ASN1Integer(BigInt.from(currentId)));
 
-    final searchRequest = ASN1Sequence(tag: 0x63); // [APPLICATION 3] SearchRequest
+    final searchRequest = ASN1Sequence(tag: 0x63); // SearchRequest
     searchRequest.add(ASN1OctetString(baseDn));
-    searchRequest.add(ASN1Enumerated(2)); // scope: wholeSubtree(2)
-    searchRequest.add(ASN1Enumerated(0)); // derefAliases: neverDerefAliases(0)
+    searchRequest.add(ASN1Enumerated(scope)); 
+    searchRequest.add(ASN1Enumerated(0)); // neverDerefAliases
     searchRequest.add(ASN1Integer(BigInt.from(sizeLimit)));
-    searchRequest.add(ASN1Integer(BigInt.from(0))); // timeLimit
+    searchRequest.add(ASN1Integer(BigInt.from(0))); 
     searchRequest.add(ASN1Boolean(false));
     
-    // Minimal filter parser or just (objectClass=*)
-    if (filter == '(objectClass=*)') {
-      searchRequest.add(ASN1OctetString('objectClass', tag: 0x87)); // [7] present
-    } else {
-      searchRequest.add(ASN1OctetString('objectClass', tag: 0x87));
-    }
+    searchRequest.add(ASN1OctetString('objectClass', tag: 0x87)); 
 
     final attrSeq = ASN1Sequence();
     for (var attr in attributes) {
@@ -76,29 +122,36 @@ class LdapClient {
     searchRequest.add(attrSeq);
     
     seq.add(searchRequest);
-    
     _socket!.add(seq.encodedBytes);
-    await _socket!.flush();
 
     final List<LdapEntry> entries = [];
+    final completer = Completer<List<LdapEntry>>();
     
-    while (true) {
-      final msg = await _readMessage();
-      if (msg == null) break;
-      
+    StreamSubscription? sub;
+    sub = _messageController.stream.listen((msg) {
+      final msgId = (msg.elements[0] as ASN1Integer).intValue;
+      if (msgId != currentId) return;
+
       final protocolOp = msg.elements[1];
-      if (protocolOp.tag == 0x64) { // SearchResultEntry
+      if (protocolOp.tag == 0x64) { 
         entries.add(_parseEntry(protocolOp as ASN1Sequence));
-      } else if (protocolOp.tag == 0x65) { // SearchResultDone
-        break;
+      } else if (protocolOp.tag == 0x65) { 
+        sub?.cancel();
+        completer.complete(entries);
       }
-    }
-    
-    return entries;
+    }, onError: (e) {
+      sub?.cancel();
+      completer.completeError(e);
+    });
+
+    return completer.future.timeout(const Duration(seconds: 10), onTimeout: () {
+      sub?.cancel();
+      return entries;
+    });
   }
 
   Future<LdapEntry?> searchRootDse() async {
-    final results = await search('', '(objectClass=*)', attributes: [
+    final results = await search('', '(objectClass=*)', scope: 0, attributes: [
       'defaultNamingContext',
       'rootDomainNamingContext',
       'dnsHostName',
@@ -113,33 +166,10 @@ class LdapClient {
   }
 
   void close() {
+    _socketSubscription?.cancel();
     _socket?.destroy();
-  }
-
-  Future<ASN1Sequence?> _readMessage() async {
-    final completer = Completer<Uint8List>();
-    final List<int> buffer = [];
-    
-    final sub = _socket!.listen((data) {
-      buffer.addAll(data);
-      try {
-        final parser = ASN1Parser(Uint8List.fromList(buffer));
-        if (parser.hasNext()) {
-          final obj = parser.nextObject();
-          if (obj is ASN1Sequence) {
-            completer.complete(Uint8List.fromList(buffer));
-          }
-        }
-      } catch (_) {}
-    });
-
-    try {
-      final data = await completer.future.timeout(const Duration(seconds: 10));
-      sub.cancel();
-      return ASN1Parser(data).nextObject() as ASN1Sequence;
-    } catch (_) {
-      sub.cancel();
-      return null;
+    if (!_messageController.isClosed) {
+      _messageController.close();
     }
   }
 

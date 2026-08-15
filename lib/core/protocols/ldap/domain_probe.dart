@@ -6,7 +6,11 @@ class DomainProbe {
     final client = LdapClient();
     try {
       await client.connect(host, port: port, useSsl: useSsl, timeout: const Duration(seconds: 3));
-      await client.bind(); // Anonymous bind
+      try {
+        await client.bind(); // Anonymous bind
+      } catch (e) {
+        // If anonymous bind fails, try to search RootDSE anyway (some servers allow it without bind)
+      }
 
       final rootDse = await client.searchRootDse();
       if (rootDse == null) return null;
