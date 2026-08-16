@@ -37,7 +37,7 @@ abstract class SmbClient {
 }
 
 class PlatformSmbClient implements SmbClient {
-  static const MethodChannel _channel = MethodChannel('com.example.flanexec/smb');
+  static const MethodChannel _channel = MethodChannel('com.r4fr13nds.flanexec/smb');
 
   @override
   Future<SmbAuthResult> authenticate(

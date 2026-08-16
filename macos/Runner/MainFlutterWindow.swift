@@ -10,7 +10,7 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
-    let channel = FlutterMethodChannel(name: "com.example.flanexec/smb", binaryMessenger: flutterViewController.engine.binaryMessenger)
+    let channel = FlutterMethodChannel(name: "com.r4fr13nds.flanexec/smb", binaryMessenger: flutterViewController.engine.binaryMessenger)
     channel.setMethodCallHandler { (call, result) in
       switch call.method {
       case "authenticate":

@@ -5,8 +5,8 @@ plugins {
 }
 
 android {
-    namespace = "com.example.flanexec"
-    compileSdk = 36
+    namespace = "com.r4fr13nds.flanexec"
+    compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -16,11 +16,11 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.flanexec"
+        applicationId = "com.r4fr13nds.flanexec"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
-        targetSdk = 36
+        targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -38,10 +38,6 @@ kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
-}
-
-dependencies {
-    implementation("com.hierynomus:smbj:0.13.0")
 }
 
 flutter {
