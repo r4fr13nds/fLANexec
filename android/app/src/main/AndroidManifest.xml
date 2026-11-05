@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for host discovery, probes, and protocol enumeration. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+
     <application
-        android:label="flanexec"
+        android:label="fLANexec"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

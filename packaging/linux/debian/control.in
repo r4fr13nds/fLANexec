@@ -1,0 +1,11 @@
+Package: flanexec
+Version: @VERSION@
+Section: net
+Priority: optional
+Architecture: amd64
+Depends: libgtk-3-0, libblkid1, liblzma5
+Maintainer: r4fr13nds <https://github.com/r4fr13nds/fLANexec>
+Homepage: https://github.com/r4fr13nds/fLANexec
+Description: LAN discovery and NetExec-style enumeration toolkit
+ fLANexec is a multi-platform Flutter app for LAN host discovery,
+ service detection, and protocol enumeration (SSH, SMB, LDAP, WinRM).

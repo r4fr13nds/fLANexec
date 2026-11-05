@@ -155,7 +155,7 @@ class DiscoverySessionNotifier extends StateNotifier<DiscoveryState> {
             if (pingResult.status == PingStatus.alive) {
               ref.read(loggerProvider.notifier).log(
                 targetIp, 
-                'Host is alive (via ${pingResult.method}${pingResult.respondedPort != null ? ':' + pingResult.respondedPort.toString() : ''})', 
+                'Host is alive (via ${pingResult.method}${pingResult.respondedPort != null ? ':${pingResult.respondedPort}' : ''})', 
                 level: LogLevel.info,
               );
               // 2. Add host immediately with minimal info

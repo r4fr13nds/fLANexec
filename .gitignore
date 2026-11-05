@@ -1,3 +1,6 @@
+# Packaged release artifacts
+/dist/
+
 # Miscellaneous
 *.class
 *.log

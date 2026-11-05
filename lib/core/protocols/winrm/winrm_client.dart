@@ -40,11 +40,9 @@ class WinrmClient {
 
       if (response.statusCode == 200) {
         return response.body.contains('IdentifyResponse');
-      } else {
-        print('WinRM Identify failed: ${response.statusCode} - ${response.body}');
       }
-    } catch (e) {
-      print('WinRM Identify error: $e');
+    } catch (_) {
+      // Identify probe failed (unreachable host, auth challenge, timeout, etc.).
     }
     return false;
   }

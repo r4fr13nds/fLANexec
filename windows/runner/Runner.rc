@@ -94,7 +94,7 @@ BEGIN
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "fLANexec" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.r4fr13nds. All rights reserved." "\0"
-            VALUE "OriginalFilename", "fLANexec.exe" "\0"
+            VALUE "OriginalFilename", "flanexec.exe" "\0"
             VALUE "ProductName", "fLANexec" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END

@@ -31,7 +31,9 @@ class IpUtils {
           }
         }
       }
-    } catch (e) {}
+    } catch (_) {
+      // Interface enumeration can fail on restricted platforms.
+    }
     return null;
   }
 

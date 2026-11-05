@@ -167,7 +167,7 @@ class SmbHostnameProbe {
     try {
       // Find strings separated by nulls
       final parts = _decodeUtf16(remainingData).split('\u0000');
-      if (parts.length >= 1 && parts[0].length > 3) {
+      if (parts.isNotEmpty && parts[0].length > 3) {
         nativeOs = parts[0];
       }
     } catch (_) {}

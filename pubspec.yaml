@@ -1,8 +1,12 @@
 name: flanexec
-description: "A new Flutter project."
+description: "Multi-platform LAN discovery and NetExec-style enumeration toolkit built with Flutter."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+homepage: https://github.com/r4fr13nds/fLANexec
+repository: https://github.com/r4fr13nds/fLANexec
+issue_tracker: https://github.com/r4fr13nds/fLANexec/issues
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -30,7 +34,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_riverpod: ^2.5.1
   hooks_riverpod: ^2.5.1
   flutter_hooks: ^0.21.0
   go_router: ^14.2.0
@@ -51,7 +54,6 @@ dependencies:
   freezed_annotation: ^2.4.1
   json_annotation: ^4.9.0
   intl: ^0.20.2
-  cupertino_icons: ^1.0.8
   google_fonts: ^6.1.0
   flutter_localizations:
     sdk: flutter
